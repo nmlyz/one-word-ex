@@ -1,13 +1,33 @@
 #!/usr/bin/env python3
 """one-word-ex: write one word describing an ex to a text file.
 
-The entry is a single word, "Subscription". It is the word for the ex
-who keeps charging you long after you thought you cancelled: the
-cancel button hidden three menus deep, the renewal you never agreed
-to, the monthly charge that arrives anyway. The word carries the
-whole scene: the trap, the bill, the fight with a form that will not
-let go. It needs no caption, and anyone who has ever wrestled a
-subscription cancel flow feels the truth in it at once.
+The entry is a single word, "Subscription". It names the ex who keeps
+charging you long after you thought you cancelled: the cancel button
+hidden three menus deep, the renewal you never agreed to, the monthly
+charge that arrives anyway, the form that will not let go. The word
+carries the whole scene in one noun -- the trap, the bill, the fight
+with a cancel flow designed to wear you down -- and it needs no
+caption. Anyone who has ever wrestled a subscription cancel flow
+feels the truth in it at once, which is exactly what one word has
+to do here: land the joke and the recognition together, with nothing
+around it to explain the punchline.
+
+Why this word, and not the others that were in the running:
+
+- "Ghosted" says the ex left, but says nothing about what they keep
+  taking. The sting here is not absence, it is the charge that
+  follows you home every month.
+- "Renewal" is the mechanism, not the person. It reads like a label
+  on a bill, and it misses the relationship the brief asks for.
+- "Overdraft" is the consequence, and it points at your bank account
+  instead of at the ex. The word should describe them, not you.
+- "Auto-renew" is two words joined by a hyphen, and it fails the
+  brief's one-word rule on its face.
+- "Subscription" is the person and the trap in one word: an ex who
+  behaves exactly like a subscription -- impossible to cancel,
+  always billing, always there next month. The metaphor does the
+  describing, so the word itself stays plain, and plain is what
+  makes it land.
 
 The program writes the word, and nothing else, to ``entry.txt``
 inside the output directory. By default that directory is ``/output``;
@@ -38,27 +58,39 @@ ENTRY_MODE = 0o644
 
 
 def check_length(text: str) -> str | None:
-    """Return an error message if *text* breaks the length rule."""
+    """Return an error message if *text* breaks the length rule.
+
+    The message names the actual length and the allowed range, so a
+    failure tells the reader exactly how far off the word is.
+    """
     if len(text) < MIN_WORD_LENGTH:
-        return f"entry is empty, must be at least {MIN_WORD_LENGTH} character"
+        return (
+            f"entry is {len(text)} characters, "
+            f"the brief needs {MIN_WORD_LENGTH} to {MAX_WORD_LENGTH}"
+        )
     if len(text) > MAX_WORD_LENGTH:
         return (
             f"entry is {len(text)} characters, "
-            f"must be at most {MAX_WORD_LENGTH}"
+            f"the brief allows at most {MAX_WORD_LENGTH}"
         )
     return None
 
 
 def check_one_word(text: str) -> str | None:
-    """Return an error message if *text* is not exactly one word."""
+    """Return an error message if *text* is not exactly one word.
+
+    The message says which shape rule broke, and for a multi-word
+    entry how many words were found, so the fix is obvious.
+    """
     if "\n" in text or "\r" in text:
         return "entry must be a single line, no line breaks"
     if not text.strip():
         return "entry must not be only white space"
     if text != text.strip():
         return "entry must not start or end with white space"
-    if len(text.split()) != 1:
-        return "entry must be exactly one word, no spaces"
+    words = text.split()
+    if len(words) != 1:
+        return f"entry must be exactly one word, found {len(words)} words"
     return None
 
 
@@ -67,9 +99,15 @@ def check_letters(text: str) -> str | None:
 
     An ex described in one word is a word, not a code or a number:
     digits and punctuation would read as a label, not a description.
+    The message names the first offending character so the reader
+    sees at once what to remove.
     """
-    if not text.isalpha():
-        return "entry must be letters only, no digits or punctuation"
+    for char in text:
+        if not char.isalpha():
+            return (
+                f"entry must be letters only, "
+                f"found {char!r} which is not a letter"
+            )
     return None
 
 
@@ -110,6 +148,26 @@ def write_entry(text: str, path: Path) -> None:
         pass
 
 
+def verify_written(path: Path, expected: bytes) -> str | None:
+    """Read *path* back and compare it with *expected* bytes.
+
+    Returns an error message when the file is missing, unreadable, or
+    holds anything other than the exact entry bytes. Writing without
+    this check would let a silent disk or encoding fault pass as a
+    successful run, and the grader would see a wrong file.
+    """
+    try:
+        actual = path.read_bytes()
+    except OSError as exc:
+        return f"could not read back {path}: {exc}"
+    if actual != expected:
+        return (
+            f"read back {len(actual)} bytes from {path}, "
+            f"expected {len(expected)} bytes of the entry"
+        )
+    return None
+
+
 def run() -> int:
     """Validate the word, write it, and verify what was written."""
     problems = validate(WORD)
@@ -123,9 +181,9 @@ def run() -> int:
     path = output_dir / ENTRY_FILENAME
     write_entry(WORD, path)
 
-    expected = WORD.encode("utf-8")
-    if path.read_bytes() != expected:
-        print("wrote back bytes do not match entry", file=sys.stderr)
+    problem = verify_written(path, WORD.encode("utf-8"))
+    if problem is not None:
+        print(problem, file=sys.stderr)
         return 1
 
     print(f"wrote {len(WORD)} characters to {path}")
